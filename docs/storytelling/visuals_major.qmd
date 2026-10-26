@@ -346,7 +346,69 @@ Nánar um [Waterfall Chart](http://www.storytellingwithdata.com/blog/2020/11/16/
 Í fossariti eru aðeins fyrsti og síðasti stöpullinn bundnir við sameiginlega grunnlínu (venjulega
 núll). Miðstöplarnir eru settir á mismunandi grunnlínur byggt á hlaupandi samtölu og mynda þannig
 eins konar stigastefnu milli byrjunar- og lokapunkta. Þetta getur verið krefjandi fyrir áhorfendur
-að túlka, en litir og tengingar á milli stimpla geta gert það skýrara.
+að túlka, en litir og tengilínur á milli stöpla geta gert það skýrara.
+
+##### Dæmi um fossarit
+
+Hér er fossarit sem sýnir hvernig fjöldi starfsmanna á tilbúnum vinnustað breytist yfir eitt ár.
+
+```{r}
+#| label: visuals-major-r-1
+#| message: false
+#| warning: false
+#| code-fold: true
+#| code-summary: "Sýna kóðann"
+#| fig-cap: "Fossarit yfir breytingar á fjölda starfsmanna á einu ári (tilbúin gögn)"
+#| fig-alt: "Fossarit með sex stöplum. Grár upphafsstöpull, grænir stöplar fyrir fjölgun, appelsínugulir fyrir fækkun og grár lokastöpull."
+library(ggplot2)
+
+fossar <- data.frame(
+  thattur  = c("Upphaf árs", "Ráðningar", "Uppsagnir", "Starfslok",
+               "Flutt frá öðru sviði", "Lok árs"),
+  breyting = c(120, 35, -18, -7, 6, NA)
+)
+
+n <- nrow(fossar)
+heild <- c(TRUE, rep(FALSE, n - 2), TRUE)
+
+# Hlaupandi samtala gefur efri brún hvers stöpuls; lokastöpullinn er summan
+fossar$enda   <- cumsum(c(fossar$breyting[-n], 0))
+fossar$breyting[n] <- fossar$enda[n]
+fossar$byrjun <- ifelse(heild, 0, fossar$enda - fossar$breyting)
+fossar$tegund <- ifelse(heild, "heild", ifelse(fossar$breyting > 0, "aukning", "faekkun"))
+fossar$x      <- seq_len(n)
+fossar$merki  <- ifelse(heild, fossar$breyting, sprintf("%+d", as.integer(fossar$breyting)))
+
+ggplot(fossar) +
+  geom_rect(aes(xmin = x - 0.4, xmax = x + 0.4, ymin = byrjun, ymax = enda, fill = tegund)) +
+  geom_segment(data = fossar[-n, ],
+               aes(x = x + 0.4, xend = x + 0.6, y = enda, yend = enda),
+               colour = "grey60", linetype = "dashed") +
+  geom_text(aes(x = x, y = pmax(byrjun, enda), label = merki), vjust = -0.5, size = 3.5) +
+  scale_x_continuous(breaks = fossar$x, labels = fossar$thattur) +
+  scale_fill_manual(values = c(heild = "grey55", aukning = "#2a9d8f", faekkun = "#e76f51"),
+                    guide = "none") +
+  labs(title = paste("Starfsmönnum fjölgaði um", fossar$enda[n] - fossar$enda[1], "á árinu"),
+       subtitle = "Ráðningar vega þyngst en uppsagnir og starfslok draga úr fjölguninni",
+       x = NULL, y = "Fjöldi starfsmanna") +
+  theme_minimal() +
+  theme(panel.grid.major.x = element_blank(), panel.grid.minor = element_blank())
+```
+
+Árið byrjar með `r fossar$enda[1]` starfsmönnum og endar með `r fossar$enda[n]`. Nettóbreytingin
+ein og sér segir okkur ekki hvort fáir hafi komið og farið eða hvort mikil hreyfing hafi verið á
+fólki. Fossaritið svarar því: `r fossar$breyting[2]` voru ráðnir en
+`r -(fossar$breyting[3] + fossar$breyting[4])` hættu, annaðhvort vegna uppsagna eða starfsloka.
+
+Takið eftir þremur atriðum í kóðanum:
+
+- **Hlaupandi samtala.** Hver miðstöpull byrjar þar sem sá á undan endaði. Því reiknum við
+  `cumsum()` af breytingunum og notum `geom_rect()` í stað `geom_col()`, því `geom_col()` byrjar
+  alltaf við núll.
+- **Litir bera merkingu.** Grár er fyrir heildargildi, grænn fyrir aukningu og appelsínugulur
+  fyrir fækkun. Lesandinn þarf því ekki að lesa formerkin til að sjá í hvaða átt breytingin fer.
+- **Tengilínur.** Brotnu línurnar á milli stöplanna sýna hvar næsti stöpull tekur við og gera
+  „stigann“ auðveldari að fylgja.
 
 ##### Notkun á fossarit
 
